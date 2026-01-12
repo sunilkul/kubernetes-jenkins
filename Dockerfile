@@ -5,7 +5,7 @@ FROM openjdk:17-jdk-slim
 WORKDIR /app
 
 # Copy fat JAR (to be built)
-COPY build/libs/kubernetes-0.0.1-SNAPSHOT.jar app.jar
+COPY build/libs/kubernetes-0.0.1-SNAPSHOT.jar myapp.jar
 
 # Expose port
 EXPOSE 8080
@@ -14,4 +14,4 @@ EXPOSE 8080
 ENV SPRING_PROFILES_ACTIVE=local
 
 # Run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "myapp.jar"]

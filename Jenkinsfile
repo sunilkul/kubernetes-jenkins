@@ -1,61 +1,93 @@
 pipeline {
   agent any
   environment {
-    IMAGE_NAME = "myapp:latest"
-    CONTAINER_NAME = "myapp"
+    IMAGE = "myapp:latest"
+    CONTAINER = "myapp-ci"
     APP_PORT = "8080"
+    JAR_GLOB = "build/libs/*.jar"
+    EXPECTED_JAR = "build/libs/myapp.jar"
   }
   stages {
-    stage('Build') {
+    stage('Checkout') {
+      steps { checkout scm }
+    }
+
+    stage('Build JVM artifact') {
       steps {
         script {
           if (isUnix()) {
-            sh 'mvn clean package -DskipTests'
+            sh './gradlew clean bootJar -x test'
           } else {
-            bat 'mvn clean package -DskipTests'
+            bat 'gradlew.bat clean bootJar -x test'
           }
         }
       }
     }
 
-    stage('Build Docker Image') {
+    stage('Ensure JAR exists') {
       steps {
         script {
           if (isUnix()) {
-            sh "docker build -t ${env.IMAGE_NAME} ."
+            sh '''
+              set -e
+              J=$(ls ${JAR_GLOB} 2>/dev/null | head -n1 || true)
+              if [ -z "$J" ]; then echo "No jar found in build/libs"; exit 1; fi
+              cp "$J" ${EXPECTED_JAR}
+              ls -la build/libs
+            '''
           } else {
-            bat "docker build -t ${env.IMAGE_NAME} ."
+            bat """
+              @echo off
+              for /f "delims=" %%F in ('dir /b ${JAR_GLOB} 2^>nul') do set JAR=%%F & goto :found
+              echo No jar found in build\\libs & exit /b 1
+              :found
+              copy /Y build\\libs\\%JAR% ${EXPECTED_JAR} >nul
+              dir build\\libs
+            """
           }
         }
       }
     }
 
-    stage('Run container and show logs') {
+    stage('Build Docker image') {
+      steps {
+        script {
+          if (isUnix()) {
+            sh "docker build -t ${IMAGE} ."
+            sh "docker images --filter=reference=${IMAGE}"
+          } else {
+            bat "docker build -t ${IMAGE} ."
+            bat "docker images --filter=reference=${IMAGE}"
+          }
+        }
+      }
+    }
+
+    stage('Run container and show startup logs') {
       steps {
         script {
           if (isUnix()) {
             sh """
-              set -e
-              docker rm -f ${CONTAINER_NAME} || true
-              docker run -d --name ${CONTAINER_NAME} -p ${APP_PORT}:${APP_PORT} ${IMAGE_NAME}
+              docker rm -f ${CONTAINER} || true
+              docker run -d --name ${CONTAINER} -p ${APP_PORT}:${APP_PORT} ${IMAGE}
               sleep 8
-              echo '--- Container status ---'
-              docker ps --filter \"name=${CONTAINER_NAME}\"
-              echo '--- Startup logs (tail) ---'
-              docker logs --tail 200 ${CONTAINER_NAME} || true
-              echo 'Application should be available at: http://localhost:${APP_PORT}'
+              echo '--- docker ps ---'
+              docker ps --filter name=${CONTAINER}
+              echo '--- logs (tail) ---'
+              docker logs --tail 200 ${CONTAINER} || true
+              echo 'Application URL: http://localhost:${APP_PORT}'
             """
           } else {
             bat """
               @echo off
-              docker rm -f ${CONTAINER_NAME} || echo ignored
-              docker run -d --name ${CONTAINER_NAME} -p ${APP_PORT}:${APP_PORT} ${IMAGE_NAME}
+              docker rm -f ${CONTAINER} || echo ignored
+              docker run -d --name ${CONTAINER} -p ${APP_PORT}:${APP_PORT} ${IMAGE}
               timeout /t 8 /nobreak >nul
-              echo --- Container status ---
-              docker ps --filter "name=${CONTAINER_NAME}"
-              echo --- Startup logs (tail) ---
-              docker logs --tail 200 ${CONTAINER_NAME} || echo ignored
-              echo Application should be available at: http://localhost:${APP_PORT}
+              echo --- docker ps ---
+              docker ps --filter "name=${CONTAINER}"
+              echo --- logs (tail) ---
+              docker logs --tail 200 ${CONTAINER} || echo ignored
+              echo Application URL: http://localhost:${APP_PORT}
             """
           }
         }
@@ -66,8 +98,11 @@ pipeline {
   post {
     always {
       script {
-        echo "Finished pipeline. If you want continuous logs use: docker logs -f ${CONTAINER_NAME}"
+        echo 'Pipeline finished. If container started you can stream logs with: docker logs -f ' + env.CONTAINER
       }
+    }
+    failure {
+      echo 'Pipeline failed - check earlier stage logs'
     }
   }
 }
