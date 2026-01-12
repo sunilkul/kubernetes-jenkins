@@ -1,0 +1,18 @@
+replicaCount: 1
+
+image:
+  repository: kubernetes-helm-demo
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+javaOpts: ""
+custom:
+  message: "Default message from Helm values.yaml"
+
+ingress:
+  enabled: false
+  host: "local.example.com"

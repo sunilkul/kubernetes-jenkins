@@ -1,0 +1,4 @@
+replicaCount: 3
+
+custom:
+  message: "Production Environment - Hello from PROD"

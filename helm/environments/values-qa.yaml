@@ -1,0 +1,4 @@
+replicaCount: 2
+
+custom:
+  message: "QA Environment - Greetings from QA"

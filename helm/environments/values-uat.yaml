@@ -1,0 +1,4 @@
+replicaCount: 2
+
+custom:
+  message: "UAT Environment - Hello from UAT"

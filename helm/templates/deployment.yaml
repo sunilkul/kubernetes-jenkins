@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "springboot-k8s-helm.fullname" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "springboot-k8s-helm.name" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "springboot-k8s-helm.name" . }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+          env:
+            - name: JAVA_OPTS
+              value: "{{ .Values.javaOpts }}"
+            - name: APP_MESSAGE
+              value: "{{ .Values.customMessage }}"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "{{ .Values.profile }}"
+          args: ["-jar", "app.jar", "--app.message=$(APP_MESSAGE)"]

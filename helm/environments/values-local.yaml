@@ -1,0 +1,7 @@
+replicaCount: 1
+
+service:
+  type: NodePort # Expose on local host
+
+custom:
+  message: "Local Environment - Hello from LOCAL"
